@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemana - Asisten AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+        }
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            margin: 0 2px;
+            background-color: #4f46e5;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.3s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.6s; }
+        
+        /* Custom scrollbar */
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #c7d2fe;
+            border-radius: 10px;
+        }
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: #a5b4fc;
+        }
+        
+        /* Smooth message appearance */
+        .message {
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeIn 0.3s forwards;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Custom logo styling */
+        .logo-container {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen flex flex-col">
+    <div class="container mx-auto px-4 py-8 flex-grow flex flex-col max-w-4xl">
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+                <div class="logo-container w-12 h-12 rounded-full flex items-center justify-center">
+                    <img src="https://i.ibb.co/Wv8VjF35" alt="Gemana Logo" class="w-8 h-8 rounded-full">
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Gemana</h1>
+                    <p class="text-sm text-gray-500">Asisten AI Anda didukung oleh Gemini</p>
+                </div>
+            </div>
+            <button id="clearChat" class="px-4 py-2 bg-white text-indigo-600 rounded-full border border-indigo-200 hover:bg-indigo-50 transition flex items-center space-x-2">
+                <i class="fas fa-trash-alt"></i>
+                <span>Hapus Percakapan</span>
+            </button>
+        </header>
+
+        <!-- Chat Container -->
+        <div id="chatContainer" class="flex-grow bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            <!-- Messages Area -->
+            <div id="messages" class="chat-container p-4 flex-grow overflow-y-auto space-y-4">
+                <!-- Welcome message -->
+                <div class="message flex space-x-3">
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <img src="https://i.ibb.co/Wv8VjF35" alt="Gemana Logo" class="w-5 h-5 rounded-full">
+                        </div>
+                    </div>
+                    <div class="bg-indigo-50 rounded-lg p-3 max-w-[80%]">
+                        <p class="text-gray-800">Halo! Saya Gemana, asisten AI Anda. Ada yang bisa saya bantu?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="border-t border-gray-200 p-4 bg-gray-50">
+                <form id="chatForm" class="flex space-x-2">
+                    <input 
+                        id="userInput"
+                        type="text"
+                        placeholder="Ketik pesan Anda di sini..."
+                        class="flex-grow px-4 py-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        autocomplete="off"
+                        required
+                    >
+                    <button 
+                        type="submit"
+                        class="w-12 h-12 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center justify-center"
+                    >
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+                <p class="text-xs text-gray-500 mt-2 text-center">Gemana mungkin menghasilkan informasi yang tidak akurat. Harap verifikasi fakta penting.</p>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="mt-6 text-center text-sm text-gray-500">
+            <p>Powered by <span class="font-medium text-indigo-600">GanSite</span></p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const API_KEY = 'AIzaSyAjyojmf1YGEodRbC1oWZCitUWZFXXfXaE';
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+            
+            const chatForm = document.getElementById('chatForm');
+            const userInput = document.getElementById('userInput');
+            const messagesContainer = document.getElementById('messages');
+            const clearChatBtn = document.getElementById('clearChat');
+            
+            // Add user message to chat
+            function addUserMessage(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message flex space-x-3 justify-end';
+                messageDiv.innerHTML = `
+                    <div class="bg-indigo-600 rounded-lg p-3 max-w-[80%]">
+                        <p class="text-white">${message}</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <i class="fas fa-user text-indigo-600 text-sm"></i>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.appendChild(messageDiv);
+                scrollToBottom();
+            }
+            
+            // Add bot message to chat with formatting support
+            function addBotMessage(message) {
+                // Check if message contains an image URL
+                const imageUrlRegex = /(https?:\/\/.*\.(?:png|jpg|jpeg|gif))/i;
+                const imageMatch = message.match(imageUrlRegex);
+                
+                let content = message;
+                if (imageMatch) {
+                    content = `<img src="${imageMatch[0]}" class="max-w-full h-auto rounded-lg mb-2" alt="Generated image">` +
+                               message.replace(imageUrlRegex, '');
+                }
+                
+                // Format text (bold/italic)
+                content = content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message flex space-x-3';
+                messageDiv.innerHTML = `
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <img src="https://i.ibb.co/Wv8VjF35" alt="Gemana Logo" class="w-5 h-5 rounded-full">
+                        </div>
+                    </div>
+                    <div class="bg-indigo-50 rounded-lg p-3 max-w-[80%]">
+                        <div class="text-gray-800">${content}</div>
+                    </div>
+                `;
+                messagesContainer.appendChild(messageDiv);
+                scrollToBottom();
+            }
+            
+            // Show typing indicator
+            function showTypingIndicator() {
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'message flex space-x-3';
+                typingDiv.id = 'typingIndicator';
+                typingDiv.innerHTML = `
+                    <div class="flex-shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <img src="https://i.ibb.co/Wv8VjF35" alt="Gemana Logo" class="w-5 h-5 rounded-full">
+                        </div>
+                    </div>
+                    <div class="bg-indigo-50 rounded-lg p-3 max-w-[80%]">
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.appendChild(typingDiv);
+                scrollToBottom();
+            }
+            
+            // Hide typing indicator
+            function hideTypingIndicator() {
+                const typingIndicator = document.getElementById('typingIndicator');
+                if (typingIndicator) {
+                    typingIndicator.remove();
+                }
+            }
+            
+            // Scroll to bottom of chat
+            function scrollToBottom() {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            // Send message to Gemini API
+            async function sendToGemini(message) {
+                try {
+                    showTypingIndicator();
+                    
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: message
+                                }]
+                            }]
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`API request failed with status ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    hideTypingIndicator();
+                    
+                    if (data.candidates && data.candidates[0].content.parts[0].text) {
+                        return data.candidates[0].content.parts[0].text;
+                    } else {
+                        return "I'm sorry, I couldn't process your request. Please try again.";
+                    }
+                } catch (error) {
+                    hideTypingIndicator();
+                    console.error('Error calling Gemini API:', error);
+                    return "Maaf, terjadi kesalahan. Silakan coba lagi nanti.";
+                }
+            }
+            
+            // Handle form submission
+            chatForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const message = userInput.value.trim();
+                
+                if (message) {
+                    addUserMessage(message);
+                    userInput.value = '';
+                    
+                    const botResponse = await sendToGemini(message);
+                    addBotMessage(botResponse);
+                }
+            });
+            
+            // Clear chat history
+            clearChatBtn.addEventListener('click', function() {
+                messagesContainer.innerHTML = `
+                    <div class="message flex space-x-3">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <img src="https://i.ibb.co/ksMCBJ9R" alt="Gemana Logo" class="w-5 h-5 rounded-full">
+                            </div>
+                        </div>
+                        <div class="bg-indigo-50 rounded-lg p-3 max-w-[80%]">
+                            <p class="text-gray-800">Halo! Saya Gemana, asisten AI Anda. Ada yang bisa saya bantu?</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // Allow Shift+Enter for new lines, Enter to submit
+            userInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    chatForm.dispatchEvent(new Event('submit'));
+                }
+            });
+            
+            // Focus input on page load
+            userInput.focus();
+        });
+    </script>
+</body>
+  </html>
